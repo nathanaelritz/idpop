@@ -9,16 +9,16 @@ number:
 date: 2026-02-01
 consensus: true
 v: 3
-area: Security
-workgroup: OAuth Working Group
+# area: Security
+# workgroup: OAuth Working Group
 keyword:
  - OAuth
  - DPoP
  - RATS
  - HPKE
 venue:
-  group: OAuth
-  type: Working Group
+#  group: OAuth
+#  type: Working Group
 
 author:
  -
