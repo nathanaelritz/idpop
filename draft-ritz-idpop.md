@@ -92,7 +92,7 @@ Figure 1: OAuth Identity Chaining Flow with RATS Verifier as AS-A and "IDPoP"-aw
 
 # Algorithms
 
-### Algorithm 1: DeriveKEM (Client)
+## Algorithm 1: DeriveKEM (Client)
 
 ~~~
 Input:  Evidence (attested by the Target Environment)
@@ -105,7 +105,7 @@ Evidence = Attest(claims={ keK_pub }, signing_key=aeK)
 
 `keK_priv` never leaves the Target Environment and is not derived by feeding Evidence into an external HKDF call; this keeps the scheme compatible with TPMs and Secure Enclaves, which do not expose internal seeds for software-side key derivation.
 
-### Algorithm 2: EncapsulateSecret (AS-A)
+## Algorithm 2: EncapsulateSecret (AS-A)
 
 ~~~
 Input:  binding (client_id + scope + audience), keK_pub (from client attestation)
@@ -118,7 +118,7 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
 K_dpop_pub  = Ed25519.Public(K_dpop_priv)
 ~~~
 
-### Algorithm 3: DeriveIdentity (Client)
+## Algorithm 3: DeriveIdentity (Client)
 
 ~~~
 Input:  binding (client_id + scope + audience), keK_priv, sealed_seed
@@ -191,8 +191,8 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
      "iat": 1706745600,
      "exp": 1706749200,
      "cnf": {
-       "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I", // Validates the DPoP signature (Standard)
-       "idpop_managed_keysets": { // Enables the Liveness Challenge (IDPoP Extension)
+       "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I",
+       "idpop_managed_keysets": {
          "kem-encapsulation-keys": [
            {
              "kty": "OKP",
@@ -206,6 +206,8 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
      }
    }
 ~~~
+
+   Here, `jkt` validates the DPoP signature (standard DPoP), and `idpop_managed_keysets` enables the IDPoP liveness challenge.
 
 # Interactive Challenge & Proofs
 
@@ -222,22 +224,29 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
 
 **Client Proof:**
 
-11. `seed = HPKE.Unseal(keK_priv, sealed_seed)` [proves fresh Evidence]
+11. `seed = HPKE.Unseal(keK_priv, sealed_seed)` (proves fresh Evidence)
 12. Client extracts sealed nonce from header
 13. Client: nonce = HPKE.AuthUnseal(nonce_sealed, keK_priv, AS_B_pubkey)
 14. Client: `K_dpop_priv = HKDF(binding, seed, "dpop")`
 15. Client creates new DPoP proof with unsealed nonce and retries:
 
+   The DPoP proof JWT uses a proposed new type, `idpop+jwt`, and carries the public Identity Key (`K_dpop`) in its header:
+
 ~~~json
     {
-      "typ": "idpop+jwt", // Proposed new type
+      "typ": "idpop+jwt",
       "alg": "EdDSA",
-      "jwk": { // The Public Identity Key (K_dpop)
+      "jwk": {
         "kty": "OKP",
         "crv": "Ed25519",
         "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
       }
     }
+~~~
+
+   The corresponding payload:
+
+~~~json
     {
       "jti": "e1j3V_bKic8-LAEB",
       "htm": "POST",
