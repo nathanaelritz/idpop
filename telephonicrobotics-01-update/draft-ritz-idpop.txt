@@ -4,8 +4,8 @@
 
 Network Working Group                                            N. Ritz
 Internet-Draft                                               Independent
-Intended status: Standards Track                         1 February 2026
-Expires: 5 August 2026
+Intended status: Standards Track                             6 July 2026
+Expires: 7 January 2027
 
 
                             Interactive DPoP
@@ -34,7 +34,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 5 August 2026.
+   This Internet-Draft will expire on 7 January 2027.
 
 Copyright Notice
 
@@ -53,7 +53,7 @@ Copyright Notice
 Table of Contents
 
    1.  Introduction
-   2.  Three-Factor Interface Model
+   2.  Key Material
    3.  Algorithms
      3.1.  Algorithm 1: DeriveKEM (Client)
        3.1.1.  Algorithm 2: EncapsulateSecret (AS-A)
@@ -68,6 +68,8 @@ Table of Contents
        7.3.1.  Post-Quantum Agility
      7.4.  DPoP Proof Replay and Pre-Computation
    8.  Normative References
+   Appendix A.  Changelog
+     A.1.  01
    Acknowledgments
    Author's Address
 
@@ -82,36 +84,34 @@ Table of Contents
    This proposal introduces a derivation scheme separating *access
    control* (encapsulate/decapsulate) from *identity* (signing).
 
-2.  Three-Factor Interface Model
+2.  Key Material
 
-   *Factors:*
+   *seed:* High-entropy secret, encapsulated by the client's KEM
+   Encapsulation Key (keK) and delivered to the client as sealed_seed.
 
-   *  *PF (Provisioning Factor):* Represents authorization intent
-      (client_id + scope + audience).
-
-   *  *EF (Evidence Factor):* Confidential attestation proof (TPM quote,
-      YubiKey HMAC-secret, biometric), never transmitted.
-
-   *  *VF (Vault Factor):* High-entropy secret, encapsulated by Evidence
-      derived key.
+   All HPKE seal/unseal and HKDF operations below are bound to a binding
+   string carrying authorization intent (client_id + scope + audience),
+   passed as the HPKE/HKDF info parameter.
 
    *Two-Stage Derivation:*
 
-   1.  Access gating: K_kem = HKDF(salt=PF, ikm=EF, info="seal")
+   1.  Access gating: keK is a KEM key pair generated natively inside
+       the client's Target Environment, gated on producing valid
+       Evidence (see Algorithm 1).
 
-   2.  Identity derivation: K_attest = HKDF(salt=PF, ikm=VF,
+   2.  Identity derivation: K_attest = HKDF(salt=binding, ikm=seed,
        info="dpop")
 
            .-------------------.
            | AS-A (Verifier)   | 2. AS-A (RATS Verifier)
            | RATS Notary as    |    Appraises Evidence
-           | OAuth AS          |    Derive K_kem, K_dpop
-           '----+----+---------'    Seal id seed → VF_sealed
+           | OAuth AS          |    Derive keK, K_dpop
+           '----+----+---------'    Seal id seed → sealed_seed
                 ^    |
    1. Evidence  |    | 3. Attestation Result (AR)
       conveyed  |    |    as JWT OAuth grant with:
-      (as commitment)|    - requested_cnf {jkt, K_kem_pub}
-                |    |    - VF_sealed
+      (as commitment)|    - requested_cnf {jkt, keK_pub}
+                |    |    - sealed_seed
                 |    v
            .----+--------.              .-------------------.
            |             |------------->|   AS-B (OAuth)    |
@@ -133,58 +133,65 @@ Table of Contents
    Figure 1: OAuth Identity Chaining Flow with RATS Verifier as AS-A and
    "IDPoP"-aware OAuth AS-B as delegated notary
 
-   _NOTE: K_kem controls access to VF (identity key seed material).
+   _NOTE: keK controls access to seed (identity key seed material).
    K_attest *is* the identity.  Compromise of the identity key alone is
-   insufficient—attacker needs to demonstrate access to notorized
-   Evidence (EF) to derive K_kem and unseal._
+   insufficient—attacker needs to demonstrate access to notarized
+   Evidence to derive keK and unseal._
 
 3.  Algorithms
 
 3.1.  Algorithm 1: DeriveKEM (Client)
 
-   Input:  PF, EF
-   Output: (K_kem_priv, K_kem_pub)
+Input:  Evidence (attested by the Target Environment)
+Output: (keK_priv, keK_pub)
 
-   K_kem_priv = HKDF(salt=PF, ikm=EF, info="seal")
-   K_kem_pub  = X25519.Public(K_kem_priv)
+(keK_priv, keK_pub) = X25519.KeyGen()   // generated inside the Target Environment
+The Target Environment binds keK_pub via attestation, e.g.:
+Evidence = Attest(claims={ keK_pub }, signing_key=aeK)
+
+   keK_priv never leaves the Target Environment and is not derived by
+   feeding Evidence into an external HKDF call; this keeps the scheme
+   compatible with TPMs and Secure Enclaves, which do not expose
+   internal seeds for software-side key derivation.
 
 3.1.1.  Algorithm 2: EncapsulateSecret (AS-A)
 
-   Input:  PF, K_kem_pub (from client attestation)
-   Output: (VF_sealed, K_dpop_pub)
+Input:  binding (client_id + scope + audience), keK_pub (from client attestation)
+Output: (sealed_seed, K_dpop_pub)
 
-   VF = Random(32)
-   VF_sealed = HPKE.Seal(recipient_pk=K_kem_pub, info=PF, plaintext=VF)
+seed = Random(32)
+sealed_seed = HPKE.Seal(recipient_pk=keK_pub, info=binding, plaintext=seed)
 
-   K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
-   K_dpop_pub  = Ed25519.Public(K_dpop_priv)
+K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
+K_dpop_pub  = Ed25519.Public(K_dpop_priv)
 
 3.1.2.  Algorithm 3: DeriveIdentity (Client)
 
-Input:  PF, K_kem_priv, VF_sealed
+Input:  binding (client_id + scope + audience), keK_priv, sealed_seed
 Output: K_dpop_priv
 
-VF = HPKE.Unseal(recipient_sk=K_kem_priv, info=PF, ciphertext=VF_sealed)
-K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
+seed = HPKE.Unseal(recipient_sk=keK_priv, info=binding, ciphertext=sealed_seed)
+K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
 
-   *Convergence:* Client derives K_dpop_priv from (PF, VF) only after
-   unsealing the encapsulated VF secret.
+   *Convergence:* Client derives K_dpop_priv from (binding, seed) only
+   after unsealing the encapsulated seed.
 
 4.  OAuth Identity Chaining Flow
 
    *Setup (Client → AS-A):*
 
-   1.  Client generates attestation evidence (EF)
+   1.  Client generates attestation Evidence
 
-   2.  Client: K_kem_priv = DeriveKEM(PF, EF)
+   2.  Client: (keK_priv, keK_pub) = DeriveKEM(Evidence)
 
-   3.  Client sends attestation to AS-A with K_kem_pub
+   3.  Client sends attestation to AS-A with keK_pub
 
    *Notarization (RATS Verifier as AS-A):*
 
    1.  AS-A Appraises attestation Evidence
 
-   2.  AS-A: (VF_sealed, K_dpop_pub) = EncapsulateSeed(PF, K_kem_pub)
+   2.  AS-A: (sealed_seed, K_dpop_pub) = EncapsulateSeed(binding,
+       keK_pub)
 
    3.  AS-A creates JWT grant to AS-B:
 
@@ -197,10 +204,16 @@ K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
         "jti": "grant-7f3a9c",
         "requested_cnf": {
           "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I",
-          "K_kem_pub": {
-            "kty": "OKP",
-            "crv": "X25519",
-            "x": "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs"
+          "idpop_managed_keysets": {
+            "kem-encapsulation-keys": [
+              {
+                "kty": "OKP",
+                "crv": "X25519",
+                "use": "enc",
+                "kid": "keK_public_01",
+                "x": "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs"
+              }
+            ]
           }
         }
       }
@@ -225,10 +238,16 @@ K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
         "exp": 1706749200,
         "cnf": {
           "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I", // Validates the DPoP signature (Standard)
-          "K_kem_pub": { // Enables the Liveness Challenge (IDPoP Extension)
-            "kty": "OKP",
-            "crv": "X25519",
-            "x": "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs"
+          "idpop_managed_keysets": { // Enables the Liveness Challenge (IDPoP Extension)
+            "kem-encapsulation-keys": [
+              {
+                "kty": "OKP",
+                "crv": "X25519",
+                "use": "enc",
+                "kid": "keK_public_01",
+                "x": "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs"
+              }
+            ]
           }
         }
       }
@@ -244,18 +263,18 @@ K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
    3.  AS-B → 401 Unauthorized
 
     WWW-Authenticate: DPoP error="use_dpop_nonce"
-    DPoP-Nonce: <Base64Url(HPKE.AuthSeal(nonce, K_kem_pub, AS_B_privkey))>
+    DPoP-Nonce: <Base64Url(HPKE.AuthSeal(nonce, keK_pub, AS_B_privkey))>
 
    *Client Proof:*
 
-   1.  VF = HPKE.Unseal(K_kem_priv, VF_sealed) [proves fresh EF]
+   1.  seed = HPKE.Unseal(keK_priv, sealed_seed) [proves fresh Evidence]
 
    2.  Client extracts sealed nonce from header
 
-   3.  Client: nonce = HPKE.AuthUnseal(nonce_sealed, K_kem_priv,
+   3.  Client: nonce = HPKE.AuthUnseal(nonce_sealed, keK_priv,
        AS_B_pubkey)
 
-   4.  Client: K_dpop_priv = HKDF(PF, VF, "dpop")
+   4.  Client: K_dpop_priv = HKDF(binding, seed, "dpop")
 
    5.  Client creates new DPoP proof with unsealed nonce and retries:
 
@@ -296,21 +315,22 @@ K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
    1.  *No durable secrets at AS-A.* Post-issuance compromise of AS-A
        yields no client key material.  RATS Verifier (AS-A) computes
        K_dpop_priv transiently, extracts K_dpop_pub, discards both
-       K_dpop_priv and secret seed material (VF).
+       K_dpop_priv and secret seed material (seed).
 
-   2.  *Sealed grant confidentiality.* Interception without K_kem_priv
-       yields nothing.  VF_sealed is HPKE-encrypted to K_kem_pub.
+   2.  *Sealed grant confidentiality.* Interception without keK_priv
+       yields nothing. sealed_seed is HPKE-encrypted to keK_pub.
 
-   3.  *Attestation-bound unsealing.* Stolen VF_sealed without device
-       access is unusable.  K_kem_priv = HKDF(PF, EF).  Unsealing VF
-       requires fresh hardware attestation.
+   3.  *Attestation-bound unsealing.* Stolen sealed_seed without device
+       access is unusable. keK_priv is generated and retained solely
+       inside the Target Environment, gated on producing valid Evidence.
+       Unsealing seed requires fresh hardware attestation.
 
-   4.  *Key separation.* K_kem controls access.  K_dpop asserts
-       identity.  Compromise of signing key doesn't grant unsealing;
-       compromise of unsealing requires live EF.
+   4.  *Key separation.* keK controls access.  K_dpop asserts identity.
+       Compromise of signing key doesn't grant unsealing; compromise of
+       unsealing requires live Evidence.
 
    5.  *Convergent derivation.* No key transport.  Client derives K_dpop
-       from (PF, VF) independently.
+       from (binding, seed) independently.
 
 7.  Security Considerations
 
@@ -323,95 +343,81 @@ K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
    access tokens, sign ID tokens, and manage client credentials.
 
    While IDPoP introduces the generation and sealing of the Identity Key
-   seed (VF) by the AS, this does not introduce a new root of trust.  An
-   AS capable of issuing a valid access_token can already impersonate
-   the user to the Resource Server.  Therefore, entrusting the AS with
-   the transient generation of the VF seed is consistent with its
-   existing role.  The security goal of IDPoP is not to protect the
-   client _from_ the AS, but to protect the client's credentials from
-   exfiltration _after_ issuance.
+   seed by the AS, this does not introduce a new root of trust.  An AS
+   capable of issuing a valid access_token can already impersonate the
+   user to the Resource Server.  Therefore, entrusting the AS with the
+   transient generation of the seed is consistent with its existing
+   role.  The security goal of IDPoP is not to protect the client _from_
+   the AS, but to protect the client's credentials from exfiltration
+   _after_ issuance.
 
 7.2.  Encapsulated Secret Transport
 
    This specification utilizes a Key Transport pattern where the
-   Identity Key material (VF) is generated by the server and transmitted
-   to the client in an HPKE-sealed envelope (VF_sealed).  While Key
-   Transport is sometimes disfavored in comparison to Key Agreement, it
-   is necessary here to bind the identity to the specific hardware
-   attestation presented by the client.
+   Identity Key material (seed) is generated by the server and
+   transmitted to the client in an HPKE-sealed envelope (sealed_seed).
+   While Key Transport is sometimes disfavored in comparison to Key
+   Agreement, it is necessary here to bind the identity to the specific
+   hardware attestation presented by the client.  Unlike a KEM shared
+   secret consumed once for a transient liveness proof, seed is re-
+   unsealed on each interactive challenge to re-derive the persistent
+   signing key K_dpop, which remains valid for the life of the access
+   token.
 
-   The security of this transport relies on *Hardware Binding*: The VF
-   is sealed to K_kem_pub, which is derived from the client's hardware-
-   bound Evidence Factor (EF).  Even if VF_sealed is intercepted, it
-   remains "inert" (unusable) without the corresponding hardware-bound
-   private key K_kem_priv.
+   The security of this transport relies on hardware binding: the seed
+   is sealed to keK_pub, which is generated and retained inside the
+   client's hardware-bound Target Environment.  Even if sealed_seed is
+   intercepted, it remains inert without the corresponding hardware-
+   bound private key keK_priv.
 
 7.3.  "Harvest Now, Decrypt Later" and Forward Secrecy
 
-   A prominent concern with any encrypted transport of secrets is the
-   "Harvest Now, Decrypt Later" (HNDL) strategy, where an adversary
-   records encrypted traffic today to decrypt it in the future once
-   quantum computing breaks current asymmetric primitives (e.g.,
-   X25519).
-
-   In the context of IDPoP, the impact of HNDL is significantly
-   mitigated by the *ephemeral nature of the Identity Key*:
-
-   *  *Short-Lived Credential Utility:* The VF seed is used solely to
-      derive the DPoP signing key (K_dpop).  This key is only useful for
-      signing DPoP proofs for the validity period of the associated
-      access token (defined by exp).
-
-   *  *Obsolescence upon Decryption:* If an adversary successfully
-      breaks the KEM algorithm years in the future and recovers a
-      historical VF, the associated access token will have long since
-      expired.  Unlike confidentiality keys used to encrypt persistent
-      data (where future decryption is catastrophic), recovering an
-      authentication key after the session window has closed yields no
-      advantage, provided the AS enforces standard expiration (exp) and
-      replay protection (jti).
+   Encrypted transport of secrets is subject to "Harvest Now, Decrypt
+   Later" (HNDL): an adversary records encrypted traffic today to
+   decrypt it once quantum computing breaks current asymmetric
+   primitives (e.g., X25519).  The impact of HNDL on IDPoP is limited by
+   the short lifetime of the identity key it protects. seed is used
+   solely to derive the DPoP signing key (K_dpop), which is only useful
+   for signing DPoP proofs during the validity period of the associated
+   access token (defined by exp).  If an adversary breaks the KEM years
+   in the future and recovers a historical seed, the associated access
+   token will have long since expired; unlike confidentiality keys
+   protecting persistent data, recovering an authentication key after
+   the session window has closed yields no advantage, provided the AS
+   enforces standard expiration (exp) and replay protection (jti).
 
 7.3.1.  Post-Quantum Agility
 
    To further mitigate HNDL risks and ensure long-term resistance,
    implementations SHOULD support cryptographic agility in the HPKE
-   configuration.
-
-   *  *Hybrid KEMs:* Implementations can adopt hybrid KEMs such as
-      *X-Wing* (combining X25519 and ML-KEM-768) to provide post-quantum
-      resistance while maintaining classical security guarantees.
-
-   *  *Algorithm Negotiation:* The alg parameter in the attestation
-      request or metadata allows the client and AS to negotiate Quantum-
-      Resistant KEMs (e.g., ML-KEM) as they become standardized,
-      ensuring the VF_sealed remains secure against future quantum
-      cryptanalysis.
+   configuration.  Implementations can adopt hybrid KEMs such as X-Wing
+   (combining X25519 and ML-KEM-768) for post-quantum resistance
+   alongside classical security guarantees.  The alg parameter in the
+   attestation request or metadata allows the client and AS to negotiate
+   Quantum-Resistant KEMs (e.g., ML-KEM) as they become standardized,
+   keeping sealed_seed secure against future quantum cryptanalysis.
 
 7.4.  DPoP Proof Replay and Pre-Computation
 
    To prevent an attacker with temporary access to the signing key (or
    the ability to predict nonces) from pre-computing proofs, this
-   specification mandates the use of HPKE-sealed nonces.
-
-   *  *Liveness Requirement:* By sealing the nonce to the client's
-      K_kem_pub, the AS ensures that only a client with active access to
-      the hardware-bound K_kem_priv can recover the nonce and sign the
-      proof.
-
-   *  *Mitigation of Malware:* Malware capable of stealing a cached
-      K_dpop from memory cannot pre-generate valid proofs for future
-      requests because it cannot decrypt the future nonces without
-      invoking the hardware anchor.
+   specification mandates the use of HPKE-sealed nonces.  Sealing the
+   nonce to the client's keK_pub ensures that only a client with active
+   access to the hardware-bound keK_priv can recover the nonce and sign
+   the proof.  This also limits the impact of a stolen cached K_dpop:
+   malware holding it cannot pre-generate valid proofs for future
+   requests, since it cannot decrypt future nonces without invoking the
+   hardware anchor.
 
 8.  Normative References
 
    [I-D.ietf-oauth-identity-chaining]
               Schwenkschuster, A., Kasselman, P., Burgin, K., Jenkins,
-              M. J., and B. Campbell, "OAuth Identity and Authorization
-              Chaining Across Domains", Work in Progress, Internet-
-              Draft, draft-ietf-oauth-identity-chaining-06, 12 September
-              2025, <https://datatracker.ietf.org/doc/html/draft-ietf-
-              oauth-identity-chaining-06>.
+              M. J., Campbell, B., and A. Parecki, "OAuth Identity and
+              Authorization Chaining Across Domains", Work in Progress,
+              Internet-Draft, draft-ietf-oauth-identity-chaining-16, 26
+              June 2026, <https://datatracker.ietf.org/doc/html/draft-
+              ietf-oauth-identity-chaining-16>.
 
    [RFC6819]  Lodderstedt, T., Ed., McGloin, M., and P. Hunt, "OAuth 2.0
               Threat Model and Security Considerations", RFC 6819,
@@ -426,6 +432,14 @@ K_dpop_priv = HKDF(salt=PF, ikm=VF, info="dpop")
               Jones, M., and D. Waite, "OAuth 2.0 Demonstrating Proof of
               Possession (DPoP)", RFC 9449, DOI 10.17487/RFC9449,
               September 2023, <https://www.rfc-editor.org/rfc/rfc9449>.
+
+Appendix A.  Changelog
+
+A.1.  01
+
+   *  restructured draft
+
+   *  updated key and key input material names
 
 Acknowledgments
 
