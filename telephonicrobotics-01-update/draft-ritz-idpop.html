@@ -1142,15 +1142,13 @@ svg {
             <p id="section-toc.1-1.3.1"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-algorithms" class="internal xref">Algorithms</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.1">
-                <p id="section-toc.1-1.3.2.1.1"><a href="#section-3.1" class="auto internal xref">3.1</a>.  <a href="#name-algorithm-1-derivekem-clien" class="internal xref">Algorithm 1: DeriveKEM (Client)</a></p>
-<ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.1.2.1">
-                    <p id="section-toc.1-1.3.2.1.2.1.1" class="keepWithNext"><a href="#section-3.1.1" class="auto internal xref">3.1.1</a>.  <a href="#name-algorithm-2-encapsulatesecr" class="internal xref">Algorithm 2: EncapsulateSecret (AS-A)</a></p>
+                <p id="section-toc.1-1.3.2.1.1" class="keepWithNext"><a href="#section-3.1" class="auto internal xref">3.1</a>.  <a href="#name-algorithm-1-derivekem-clien" class="internal xref">Algorithm 1: DeriveKEM (Client)</a></p>
 </li>
-                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.1.2.2">
-                    <p id="section-toc.1-1.3.2.1.2.2.1"><a href="#section-3.1.2" class="auto internal xref">3.1.2</a>.  <a href="#name-algorithm-3-deriveidentity-" class="internal xref">Algorithm 3: DeriveIdentity (Client)</a></p>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.2">
+                <p id="section-toc.1-1.3.2.2.1"><a href="#section-3.2" class="auto internal xref">3.2</a>.  <a href="#name-algorithm-2-encapsulatesecr" class="internal xref">Algorithm 2: EncapsulateSecret (AS-A)</a></p>
 </li>
-                </ul>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3.2.3">
+                <p id="section-toc.1-1.3.2.3.1"><a href="#section-3.3" class="auto internal xref">3.3</a>.  <a href="#name-algorithm-3-deriveidentity-" class="internal xref">Algorithm 3: DeriveIdentity (Client)</a></p>
 </li>
             </ul>
 </li>
@@ -1287,12 +1285,14 @@ Evidence = Attest(claims={ keK_pub }, signing_key=aeK)
 </pre><a href="#section-3.1-1" class="pilcrow">¶</a>
 </div>
 <p id="section-3.1-2"><code>keK_priv</code> never leaves the Target Environment and is not derived by feeding Evidence into an external HKDF call; this keeps the scheme compatible with TPMs and Secure Enclaves, which do not expose internal seeds for software-side key derivation.<a href="#section-3.1-2" class="pilcrow">¶</a></p>
+</section>
+</div>
 <div id="algorithm-2-encapsulatesecret-as-a">
-<section id="section-3.1.1">
-          <h4 id="name-algorithm-2-encapsulatesecr">
-<a href="#section-3.1.1" class="section-number selfRef">3.1.1. </a><a href="#name-algorithm-2-encapsulatesecr" class="section-name selfRef">Algorithm 2: EncapsulateSecret (AS-A)</a>
-          </h4>
-<div class="alignLeft art-text artwork" id="section-3.1.1-1">
+<section id="section-3.2">
+        <h3 id="name-algorithm-2-encapsulatesecr">
+<a href="#section-3.2" class="section-number selfRef">3.2. </a><a href="#name-algorithm-2-encapsulatesecr" class="section-name selfRef">Algorithm 2: EncapsulateSecret (AS-A)</a>
+        </h3>
+<div class="alignLeft art-text artwork" id="section-3.2-1">
 <pre>
 Input:  binding (client_id + scope + audience), keK_pub (from client attestation)
 Output: (sealed_seed, K_dpop_pub)
@@ -1302,27 +1302,25 @@ sealed_seed = HPKE.Seal(recipient_pk=keK_pub, info=binding, plaintext=seed)
 
 K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
 K_dpop_pub  = Ed25519.Public(K_dpop_priv)
-</pre><a href="#section-3.1.1-1" class="pilcrow">¶</a>
+</pre><a href="#section-3.2-1" class="pilcrow">¶</a>
 </div>
 </section>
 </div>
 <div id="algorithm-3-deriveidentity-client">
-<section id="section-3.1.2">
-          <h4 id="name-algorithm-3-deriveidentity-">
-<a href="#section-3.1.2" class="section-number selfRef">3.1.2. </a><a href="#name-algorithm-3-deriveidentity-" class="section-name selfRef">Algorithm 3: DeriveIdentity (Client)</a>
-          </h4>
-<div class="alignLeft art-text artwork" id="section-3.1.2-1">
+<section id="section-3.3">
+        <h3 id="name-algorithm-3-deriveidentity-">
+<a href="#section-3.3" class="section-number selfRef">3.3. </a><a href="#name-algorithm-3-deriveidentity-" class="section-name selfRef">Algorithm 3: DeriveIdentity (Client)</a>
+        </h3>
+<div class="alignLeft art-text artwork" id="section-3.3-1">
 <pre>
 Input:  binding (client_id + scope + audience), keK_priv, sealed_seed
 Output: K_dpop_priv
 
 seed = HPKE.Unseal(recipient_sk=keK_priv, info=binding, ciphertext=sealed_seed)
 K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
-</pre><a href="#section-3.1.2-1" class="pilcrow">¶</a>
+</pre><a href="#section-3.3-1" class="pilcrow">¶</a>
 </div>
-<p id="section-3.1.2-2"><strong>Convergence:</strong> Client derives K_dpop_priv from (binding, seed) only after unsealing the encapsulated seed.<a href="#section-3.1.2-2" class="pilcrow">¶</a></p>
-</section>
-</div>
+<p id="section-3.3-2"><strong>Convergence:</strong> Client derives K_dpop_priv from (binding, seed) only after unsealing the encapsulated seed.<a href="#section-3.3-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1407,8 +1405,8 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
      "iat": 1706745600,
      "exp": 1706749200,
      "cnf": {
-       "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I", // Validates the DPoP signature (Standard)
-       "idpop_managed_keysets": { // Enables the Liveness Challenge (IDPoP Extension)
+       "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I",
+       "idpop_managed_keysets": {
          "kem-encapsulation-keys": [
            {
              "kty": "OKP",
@@ -1423,6 +1421,7 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
    }
 </pre><a href="#section-4-10" class="pilcrow">¶</a>
 </div>
+<p id="section-4-11">Here, <code>jkt</code> validates the DPoP signature (standard DPoP), and <code>idpop_managed_keysets</code> enables the IDPoP liveness challenge.<a href="#section-4-11" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="interactive-challenge-proofs">
@@ -1451,7 +1450,7 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
 <p id="section-5-4"><strong>Client Proof:</strong><a href="#section-5-4" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-5-5">
 <li id="section-5-5.1">
-          <p id="section-5-5.1.1"><code>seed = HPKE.Unseal(keK_priv, sealed_seed)</code> [proves fresh Evidence]<a href="#section-5-5.1.1" class="pilcrow">¶</a></p>
+          <p id="section-5-5.1.1"><code>seed = HPKE.Unseal(keK_priv, sealed_seed)</code> (proves fresh Evidence)<a href="#section-5-5.1.1" class="pilcrow">¶</a></p>
 </li>
         <li id="section-5-5.2">
           <p id="section-5-5.2.1">Client extracts sealed nonce from header<a href="#section-5-5.2.1" class="pilcrow">¶</a></p>
@@ -1466,17 +1465,23 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
           <p id="section-5-5.5.1">Client creates new DPoP proof with unsealed nonce and retries:<a href="#section-5-5.5.1" class="pilcrow">¶</a></p>
 </li>
       </ol>
-<div class="lang-json sourcecode" id="section-5-6">
+<p id="section-5-6">The DPoP proof JWT uses a proposed new type, <code>idpop+jwt</code>, and carries the public Identity Key (<code>K_dpop</code>) in its header:<a href="#section-5-6" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-5-7">
 <pre>
     {
-      "typ": "idpop+jwt", // Proposed new type
+      "typ": "idpop+jwt",
       "alg": "EdDSA",
-      "jwk": { // The Public Identity Key (K_dpop)
+      "jwk": {
         "kty": "OKP",
         "crv": "Ed25519",
         "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
       }
     }
+</pre><a href="#section-5-7" class="pilcrow">¶</a>
+</div>
+<p id="section-5-8">The corresponding payload:<a href="#section-5-8" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-5-9">
+<pre>
     {
       "jti": "e1j3V_bKic8-LAEB",
       "htm": "POST",
@@ -1485,21 +1490,21 @@ K_dpop_priv = HKDF(salt=binding, ikm=seed, info="dpop")
       "ath": "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo",
       "nonce": "kH8Ws3xYnE2f7d9pQ1vR5jL4mT6oU0aC8bN3gZ7yXsA"
     }
-</pre><a href="#section-5-6" class="pilcrow">¶</a>
+</pre><a href="#section-5-9" class="pilcrow">¶</a>
 </div>
-<p id="section-5-7"><strong>Verification (AS-B or RS-B):</strong><a href="#section-5-7" class="pilcrow">¶</a></p>
-<ol start="1" type="1" class="normal type-1" id="section-5-8">
-<li id="section-5-8.1">
-          <p id="section-5-8.1.1">Verify DPoP signature with K_dpop_pub (from token's <code>cnf.jkt</code>)<a href="#section-5-8.1.1" class="pilcrow">¶</a></p>
+<p id="section-5-10"><strong>Verification (AS-B or RS-B):</strong><a href="#section-5-10" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-5-11">
+<li id="section-5-11.1">
+          <p id="section-5-11.1.1">Verify DPoP signature with K_dpop_pub (from token's <code>cnf.jkt</code>)<a href="#section-5-11.1.1" class="pilcrow">¶</a></p>
 </li>
-        <li id="section-5-8.2">
-          <p id="section-5-8.2.1">Verify <code>proof.nonce == SHA256(expected_nonce)</code><a href="#section-5-8.2.1" class="pilcrow">¶</a></p>
+        <li id="section-5-11.2">
+          <p id="section-5-11.2.1">Verify <code>proof.nonce == SHA256(expected_nonce)</code><a href="#section-5-11.2.1" class="pilcrow">¶</a></p>
 </li>
-        <li id="section-5-8.3">
-          <p id="section-5-8.3.1">Accept request<a href="#section-5-8.3.1" class="pilcrow">¶</a></p>
+        <li id="section-5-11.3">
+          <p id="section-5-11.3.1">Accept request<a href="#section-5-11.3.1" class="pilcrow">¶</a></p>
 </li>
       </ol>
-<p id="section-5-9"><em>Note: The interactive challenge (Steps 8-10) introduces a round-trip. To mitigate latency, this challenge MAY be performed once per session or upon detecting high-risk context. The resulting <code>nonce</code> acts as a session binding signal for subsequent DPoP proofs, reducing overhead for high-frequency API calls.</em><a href="#section-5-9" class="pilcrow">¶</a></p>
+<p id="section-5-12"><em>Note: The interactive challenge (Steps 8-10) introduces a round-trip. To mitigate latency, this challenge MAY be performed once per session or upon detecting high-risk context. The resulting <code>nonce</code> acts as a session binding signal for subsequent DPoP proofs, reducing overhead for high-frequency API calls.</em><a href="#section-5-12" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="security-properties">
