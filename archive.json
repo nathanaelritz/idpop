@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-07-05T04:02:30.250754+00:00",
+  "timestamp": "2026-07-07T03:59:18.303826+00:00",
   "repo": "nathanaelritz/idpop",
   "labels": [
     {
@@ -50,5 +50,62 @@
     }
   ],
   "issues": [],
-  "pulls": []
+  "pulls": [
+    {
+      "number": 1,
+      "id": "PR_kwDORGcKjs7ud-2B",
+      "title": "Update draft-ritz-idpop.md",
+      "url": "https://github.com/nathanaelritz/idpop/pull/1",
+      "state": "MERGED",
+      "author": "telephonicrobotics",
+      "authorAssociation": "CONTRIBUTOR",
+      "assignees": [],
+      "labels": [],
+      "body": "",
+      "createdAt": "2026-07-06T17:34:21Z",
+      "updatedAt": "2026-07-06T17:35:12Z",
+      "baseRepository": "nathanaelritz/idpop",
+      "baseRefName": "main",
+      "baseRefOid": "42412ea0f12fc6099c31a046f8c51e7abc50bac9",
+      "headRepository": "nathanaelritz/idpop",
+      "headRefName": "telephonicrobotics-01-update",
+      "headRefOid": "38b17e6a334574d7815cccbf8eabb5eec87e8931",
+      "closedAt": "2026-07-06T17:35:12Z",
+      "mergedAt": "2026-07-06T17:35:12Z",
+      "mergedBy": "telephonicrobotics",
+      "mergeCommit": {
+        "oid": "0b471c1833f09caea9688464460e30795f394e81"
+      },
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 2,
+      "id": "PR_kwDORGcKjs7ueOZB",
+      "title": "Addresses remaining issues.",
+      "url": "https://github.com/nathanaelritz/idpop/pull/2",
+      "state": "MERGED",
+      "author": "telephonicrobotics",
+      "authorAssociation": "CONTRIBUTOR",
+      "assignees": [],
+      "labels": [],
+      "body": "",
+      "createdAt": "2026-07-06T17:44:42Z",
+      "updatedAt": "2026-07-06T17:44:54Z",
+      "baseRepository": "nathanaelritz/idpop",
+      "baseRefName": "main",
+      "baseRefOid": "0b471c1833f09caea9688464460e30795f394e81",
+      "headRepository": "nathanaelritz/idpop",
+      "headRefName": "telephonicrobotics-01-update",
+      "headRefOid": "9e71c02a61c9c82bb1573937c5a64f00beb50c59",
+      "closedAt": "2026-07-06T17:44:53Z",
+      "mergedAt": "2026-07-06T17:44:53Z",
+      "mergedBy": "telephonicrobotics",
+      "mergeCommit": {
+        "oid": "3d7ad95daf802fc94e8c820eb1ffa48569540520"
+      },
+      "comments": [],
+      "reviews": []
+    }
+  ]
 }
